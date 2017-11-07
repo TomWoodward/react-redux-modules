@@ -26,7 +26,7 @@ export default function(app, options = {}) {
     App: app.getReducer(),
   });
 
-  const composeEnhancers = options.__DEV__
+  const composeEnhancers = options.devtools
     ? typeof window === "object" && window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__
       ? window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__
       : composeWithDevTools({port: 8000})

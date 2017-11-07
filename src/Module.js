@@ -105,7 +105,7 @@ export default class Module {
 
     this.actions = assign(this.actions, mapValuesWithKey(actions, (action, key) => {
       const type = this.getFullActionName(key);
-      return (...payload) => ({type, payload});
+      return payload => ({type, payload});
     }));
   };
 
