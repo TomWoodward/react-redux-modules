@@ -1,9 +1,9 @@
-# daft-modules as a way to organize react-redux
+# react-redux-modules as a way to organize react-redux
 
 ## Modules
 
 ```js
-import {Module} from 'daft-modules';
+import {Module} from 'react-redux-modules';
 
 export default new Module('MyModule');
 ```
@@ -16,8 +16,8 @@ state called `MyModule`, but other than that do nothing.
 
 ### Main Component
 ```js
-// - /myModule/index.js
-import {Module} from 'daft-modules';
+// - /myModule/module.js
+import {Module} from 'react-redux-modules';
 import MainComponent from './MainComponent';
 
 export default new Module('MyModule', {
@@ -28,8 +28,8 @@ export default new Module('MyModule', {
 ```js
 // - /myModule/MainComponent.js
 import React from 'react';  
-import {connect} from 'daft-modules'; 
-import module from '.';
+import {connect} from 'react-redux-modules'; 
+import module from './module';
 
 function MainComponent() {
   return <h1>Hello World</h1>;
@@ -50,7 +50,7 @@ logged in user, for this reason the complete state tree is also provided.
 ### Reducers
 
 ```js
-import {Module} from 'daft-modules';
+import {Module} from 'react-redux-modules';
 import MainComponent from './MainComponent';
 import {set} from 'lodash/fp';
 
@@ -69,7 +69,7 @@ reducers and builds the whole thing for you. `initialState` is optional and is e
 ### Effects
 
 ```js
-import {Module} from 'daft-modules';
+import {Module} from 'react-redux-modules';
 import MainComponent from './MainComponent';
 
 export default new Module('MyModule', {
@@ -97,7 +97,7 @@ from a different module, you can, but you have to import the module and call dis
 ### Navigation
 
 ```js
-import {Module} from 'daft-modules';
+import {Module} from 'react-redux-modules';
 import MainComponent from './MainComponent';
 import otherMoudle from '../otherModule';
 
@@ -119,7 +119,7 @@ which gets mapped to [this](https://reactnavigation.org/docs/navigators/navigati
 ### Submodules
 
 ```js
-import {Module} from 'daft-modules';
+import {Module} from 'react-redux-modules';
 import MainComponent from './MainComponent';
 import submodule1 from './submodule1';
 import submodule2 from './submodule2';
@@ -139,7 +139,7 @@ include its submodule's reducers and introduce the submodules to the navigator.
 ## Bootstrapping
 
 ```js
-import {createAppContainer, Module} from 'daft-modules';
+import {createAppContainer, Module} from 'react-redux-modules';
 import module1 from './module1';
 import module2 from './module2';
 
@@ -150,11 +150,15 @@ const app = new Module('App', {
   ]
 });
 
+// for expo
 return createAppContainer(app);
+
+// for web
+const container = createAppContainer(app);
+ReactDOM.render(React.createElement(Container), document.getElementById('root'));
 ```
 
-This is all you need to do for expo, for web you might need a little more (but this isn't even kind of web
-compatable yet anyway). `createAppContainer` inspects your module tree and generates a redux store, redux
+`createAppContainer` inspects your module tree and generates a redux store, redux
 reducers, navigation router, sets up the required redux and navigation react components for you, and returns that.
 
 
@@ -167,7 +171,7 @@ reducers, navigation router, sets up the required redux and navigation react com
 
 ```js
 // - /mixins/Pagination/index.js
-import {Mixin} from 'daft-modules';
+import {Mixin} from 'react-redux-modules';
 import {set} from 'lodash/fp';
 
 export default class Pagination extends Mixin {
@@ -201,8 +205,8 @@ from the module by specifying a reducer or effect with the same name. The mixin 
 be connected to the module wherever they're used.
 
 ```js
-// - /UserList/index.js
-import {Module} from 'daft-modules';
+// - /UserList/module.js
+import {Module} from 'react-redux-modules';
 import Pagination from '../mixins/Pagination';
 import ListComponent from './ListComponent';
 import UserRow from './UserRow';
@@ -218,27 +222,27 @@ export default new Module('UserList', {
 ```js
 // - /UserList/Component.js
 import React from 'react';
-import {connect} from 'daft-modules';
+import {connect} from 'react-redux-modules';
 import PageLinks from '../mixins/Pagination/PageLinks';
-import module from '.';
+import ListComponent from './ListComponent';
+import module from './module';
 
 const ConnectedPageLinks = connect(() => module, PageLinks);
 
 export default function UserList() {
-  return <some>
-    <jsx />
+  return <div>
     <ListComponent />
     <ConnectedPageLinks />
-  </some>
+  </div>
 }
 ```
 
 ```js
 // - /UserList/ListComponent.js
 import React, {Component} from 'react';
-import {connect} from 'daft-modules';
+import {connect} from 'react-redux-modules';
 import UserRow from './UserRow';
-import module from '.';
+import module from './module';
 
 class ListComponent extends Component {
   static mapStateToProps(localState) {
@@ -249,10 +253,9 @@ class ListComponent extends Component {
   
   render() {
     const {users} = this.props;
-    return <some>
-      <jsx />
+    return <ul>
       {users.map(user => <UserRow key={user} id={user} />)}
-    </some>
+    </ul>
   }
 }
 
@@ -262,8 +265,8 @@ export default connect(() => module, ListComponent);
 ```js
 // - /UserList/UserRow.js
 import React, {Component} from 'react';
-import {connect} from 'daft-modules';
-import module from '.';
+import {connect} from 'react-redux-modules';
+import module from './module';
 
 class UserRow extends Component {
   static mapStateToProps(localState, state, ownProps) {
@@ -274,13 +277,9 @@ class UserRow extends Component {
   
   render() {
     const {user} = this.props;
-    return <some>
-      <jsx />
-    </some>
+    return <li>{user.name}</li>;
   }
 }
 
 export default connect(() => module, UserRow);
 ```
-
-
