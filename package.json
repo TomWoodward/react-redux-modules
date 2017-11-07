@@ -1,9 +1,9 @@
 {
-  "name": "redux-modules",
+  "name": "react-redux-modules",
   "private": true,
   "version": "1.0.0",
   "main": "dist/build.js",
-  "repository": "https://github.com/daftlabs/redux-modules",
+  "repository": "https://github.com/daftlabs/react-redux-modules",
   "license": "MIT",
   "scripts": {
     "build": "webpack"
