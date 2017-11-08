@@ -10,13 +10,17 @@ import Module from './Module';
 export default function(app, options = {}) {
   app.initialize();
 
-  if (!app.hasNavigator()) {
+  if (!app.isNavigable()) {
     throw new Error(`Root module ${app.name} must be navigable`);
   }
 
   const Navigator = app.getNavigator();
+  const {initialPath, enableDevtools} = options;
 
-  const navigationReducer = (state, action) => {
+  const initialRouterAction = Navigator.router.getActionForPathAndParams(initialPath);
+  const initialRouterState = initialRouterAction ? Navigator.router.getStateForAction(initialRouterAction) : null;
+
+  const navigationReducer = (state = initialRouterState, action) => {
     const nextState = Navigator.router.getStateForAction(action, state);
     return nextState || state;
   };
@@ -26,7 +30,7 @@ export default function(app, options = {}) {
     App: app.getReducer(),
   });
 
-  const composeEnhancers = options.devtools
+  const composeEnhancers = enableDevtools
     ? typeof window === "object" && window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__
       ? window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__
       : composeWithDevTools({port: 8000})

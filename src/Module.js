@@ -1,14 +1,16 @@
 import React from 'react';
 import {assign, once, flatten, pick, keyBy, mapKeys, mapValues} from 'lodash/fp';
-import {NavigationActions, createNavigator, addNavigationHelpers, TabRouter} from 'react-navigation';
+import {NavigationActions, createNavigator, addNavigationHelpers, StackRouter} from 'react-navigation';
 import {mapValues as mapValuesWithKey} from 'lodash';
 import {combineReducers} from 'redux';
-import {filter, flow, get, set} from 'lodash/fp';
+import {identity, filter, flow, get, set} from 'lodash/fp';
 
 export default class Module {
   component = null;
   namespace = '';
   name = '';
+  path = '';
+  basePath = '';
   submodules = [];
   navigationOptions = {};
 
@@ -27,6 +29,7 @@ export default class Module {
   }
 
   getValidOptions = pick([
+    'path',
     'component',
     'submodules',
     'navigationOptions',
@@ -56,11 +59,13 @@ export default class Module {
       ...this.getStateModificationHelpers(dispatch),
       action: action,
       payload: action.payload,
+      module: this,
     });
   };
 
   getStateConsumptionHelpers = state => {
     return {
+      route: get(`navigation.routes.${state.navigation.index}`, state),
       localState: get(this.fullname, state),
       state,
     };
@@ -111,8 +116,13 @@ export default class Module {
   initialize = () => {
     this.submodules.forEach(module => {
       module.setNamespace(this.fullname);
-      module.initialize();
     });
+
+    if (!this.namespace) {
+      this.submodules.forEach(module => {
+        module.setBasePath(this.path);
+      });
+    }
 
     const actions = {
       ...this.effects,
@@ -123,10 +133,22 @@ export default class Module {
       const type = this.getFullActionName(key);
       return payload => ({type, payload});
     }));
+
+    this.submodules.forEach(module => {
+      module.initialize();
+    });
   };
 
   getName() {
     return this.name || this.constructor.name;
+  }
+
+  setBasePath(basePath) {
+    this.basePath = basePath;
+  }
+
+  getPath() {
+    return filter(identity, [this.basePath, this.path]).join('/');
   }
 
   setNamespace(namespace) {
@@ -165,52 +187,58 @@ export default class Module {
     return this.component;
   }
 
-  hasNavigator() {
-    const submodulesWithComponent = filter(module => module.hasComponent(), this.submodules);
-    return this.hasComponent() || submodulesWithComponent.length > 0;
+  getNavigableSubmodules() {
+    return filter(module => module.isNavigable(), this.submodules);
+  }
+
+  hasNavigableSubmodules() {
+    return this.getNavigableSubmodules().length > 0;
+  }
+
+  isNavigable() {
+    return this.hasComponent() || this.hasNavigableSubmodules();
   }
 
   getNavigatorConfig() {
-    const submodulesWithComponent = filter(module => module.hasComponent(), this.submodules);
-
-    if (!this.hasNavigator()) {
+    if (!this.isNavigable()) {
       throw new Error(`cannot build navigation to module ${this.fullname}`);
     }
 
-    if (submodulesWithComponent.length > 0) {
-      return {screen: this.getNavigator()};
+    if (this.hasNavigableSubmodules()) {
+      return {
+        path: this.getPath(),
+        screen: this.getNavigator(),
+        navigationOptions: this.navigationOptions,
+      };
     }
 
-    return this.getOwnNavigatorConfig();
-  }
-
-  getOwnNavigatorConfig() {
     return {
       screen: this.component,
+      path: this.getPath(),
       navigationOptions: this.navigationOptions,
     };
   }
 
   getNavigator() {
     const screens = flow(
-      filter(module => module.hasComponent()),
       keyBy(module => module.name),
       mapValues(module => module.getNavigatorConfig())
-    )(this.submodules);
-
-    if (this.component) {
-      screens.index = this.getOwnNavigatorConfig();
-    }
+    )(this.getNavigableSubmodules());
 
     const NavView = ({ navigation, router }) => {
       const {state} = navigation;
-      const Component = router.getComponentForState(state);
-      return React.createElement(Component, {navigation: addNavigationHelpers({
+      const content = React.createElement(router.getComponentForState(state), {navigation: addNavigationHelpers({
         ...navigation,
         state: state.routes[state.index],
       })});
+
+      if (this.hasComponent()) {
+        return React.createElement(this.getComponent(), {}, content);
+      } else {
+        return content;
+      }
     };
 
-    return createNavigator(TabRouter(screens))(NavView);
+    return createNavigator(StackRouter(screens))(NavView);
   }
 }

@@ -2286,6 +2286,8 @@ var Module = function () {
     this.component = null;
     this.namespace = '';
     this.name = '';
+    this.path = '';
+    this.basePath = '';
     this.submodules = [];
     this.navigationOptions = {};
     this.actions = {
@@ -2296,7 +2298,7 @@ var Module = function () {
     this.initialState = {};
     this.reducers = {};
     this.effects = [];
-    this.getValidOptions = (0, _fp.pick)(['component', 'submodules', 'navigationOptions', 'initialState', 'reducers', 'effects']);
+    this.getValidOptions = (0, _fp.pick)(['path', 'component', 'submodules', 'navigationOptions', 'initialState', 'reducers', 'effects']);
 
     this.getFullActionName = function (key) {
       return _this.fullname + '/' + key;
@@ -2306,13 +2308,15 @@ var Module = function () {
       return function (state, dispatch, action) {
         effect(_extends({}, _this.getStateConsumptionHelpers(state), _this.getStateModificationHelpers(dispatch), {
           action: action,
-          payload: action.payload
+          payload: action.payload,
+          module: _this
         }));
       };
     };
 
     this.getStateConsumptionHelpers = function (state) {
       return {
+        route: (0, _fp.get)('navigation.routes.' + state.navigation.index, state),
         localState: (0, _fp.get)(_this.fullname, state),
         state: state
       };
@@ -2330,8 +2334,13 @@ var Module = function () {
     this.initialize = function () {
       _this.submodules.forEach(function (module) {
         module.setNamespace(_this.fullname);
-        module.initialize();
       });
+
+      if (!_this.namespace) {
+        _this.submodules.forEach(function (module) {
+          module.setBasePath(_this.path);
+        });
+      }
 
       var actions = _extends({}, _this.effects, _this.reducers);
 
@@ -2341,6 +2350,10 @@ var Module = function () {
           return { type: type, payload: payload };
         };
       }));
+
+      _this.submodules.forEach(function (module) {
+        module.initialize();
+      });
     };
 
     this.getModules = (0, _fp.once)(function () {
@@ -2440,6 +2453,16 @@ var Module = function () {
       return this.name || this.constructor.name;
     }
   }, {
+    key: 'setBasePath',
+    value: function setBasePath(basePath) {
+      this.basePath = basePath;
+    }
+  }, {
+    key: 'getPath',
+    value: function getPath() {
+      return (0, _fp.filter)(_fp.identity, [this.basePath, this.path]).join('/');
+    }
+  }, {
     key: 'setNamespace',
     value: function setNamespace(namespace) {
       this.namespace = namespace;
@@ -2461,65 +2484,71 @@ var Module = function () {
       return this.component;
     }
   }, {
-    key: 'hasNavigator',
-    value: function hasNavigator() {
-      var submodulesWithComponent = (0, _fp.filter)(function (module) {
-        return module.hasComponent();
+    key: 'getNavigableSubmodules',
+    value: function getNavigableSubmodules() {
+      return (0, _fp.filter)(function (module) {
+        return module.isNavigable();
       }, this.submodules);
-      return this.hasComponent() || submodulesWithComponent.length > 0;
+    }
+  }, {
+    key: 'hasNavigableSubmodules',
+    value: function hasNavigableSubmodules() {
+      return this.getNavigableSubmodules().length > 0;
+    }
+  }, {
+    key: 'isNavigable',
+    value: function isNavigable() {
+      return this.hasComponent() || this.hasNavigableSubmodules();
     }
   }, {
     key: 'getNavigatorConfig',
     value: function getNavigatorConfig() {
-      var submodulesWithComponent = (0, _fp.filter)(function (module) {
-        return module.hasComponent();
-      }, this.submodules);
-
-      if (!this.hasNavigator()) {
+      if (!this.isNavigable()) {
         throw new Error('cannot build navigation to module ' + this.fullname);
       }
 
-      if (submodulesWithComponent.length > 0) {
-        return { screen: this.getNavigator() };
+      if (this.hasNavigableSubmodules()) {
+        return {
+          path: this.getPath(),
+          screen: this.getNavigator(),
+          navigationOptions: this.navigationOptions
+        };
       }
 
-      return this.getOwnNavigatorConfig();
-    }
-  }, {
-    key: 'getOwnNavigatorConfig',
-    value: function getOwnNavigatorConfig() {
       return {
         screen: this.component,
+        path: this.getPath(),
         navigationOptions: this.navigationOptions
       };
     }
   }, {
     key: 'getNavigator',
     value: function getNavigator() {
-      var screens = (0, _fp.flow)((0, _fp.filter)(function (module) {
-        return module.hasComponent();
-      }), (0, _fp.keyBy)(function (module) {
+      var _this4 = this;
+
+      var screens = (0, _fp.flow)((0, _fp.keyBy)(function (module) {
         return module.name;
       }), (0, _fp.mapValues)(function (module) {
         return module.getNavigatorConfig();
-      }))(this.submodules);
-
-      if (this.component) {
-        screens.index = this.getOwnNavigatorConfig();
-      }
+      }))(this.getNavigableSubmodules());
 
       var NavView = function NavView(_ref3) {
         var navigation = _ref3.navigation,
             router = _ref3.router;
         var state = navigation.state;
 
-        var Component = router.getComponentForState(state);
-        return _react2.default.createElement(Component, { navigation: (0, _reactNavigation.addNavigationHelpers)(_extends({}, navigation, {
+        var content = _react2.default.createElement(router.getComponentForState(state), { navigation: (0, _reactNavigation.addNavigationHelpers)(_extends({}, navigation, {
             state: state.routes[state.index]
           })) });
+
+        if (_this4.hasComponent()) {
+          return _react2.default.createElement(_this4.getComponent(), {}, content);
+        } else {
+          return content;
+        }
       };
 
-      return (0, _reactNavigation.createNavigator)((0, _reactNavigation.TabRouter)(screens))(NavView);
+      return (0, _reactNavigation.createNavigator)((0, _reactNavigation.StackRouter)(screens))(NavView);
     }
   }]);
 
@@ -30341,13 +30370,22 @@ exports.default = function (app) {
 
   app.initialize();
 
-  if (!app.hasNavigator()) {
+  if (!app.isNavigable()) {
     throw new Error('Root module ' + app.name + ' must be navigable');
   }
 
   var Navigator = app.getNavigator();
+  var initialPath = options.initialPath,
+      enableDevtools = options.enableDevtools;
 
-  var navigationReducer = function navigationReducer(state, action) {
+
+  var initialRouterAction = Navigator.router.getActionForPathAndParams(initialPath);
+  var initialRouterState = initialRouterAction ? Navigator.router.getStateForAction(initialRouterAction) : null;
+
+  var navigationReducer = function navigationReducer() {
+    var state = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : initialRouterState;
+    var action = arguments[1];
+
     var nextState = Navigator.router.getStateForAction(action, state);
     return nextState || state;
   };
@@ -30357,7 +30395,7 @@ exports.default = function (app) {
     App: app.getReducer()
   });
 
-  var composeEnhancers = options.devtools ? (typeof window === 'undefined' ? 'undefined' : _typeof(window)) === "object" && window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ ? window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ : (0, _remoteReduxDevtools.composeWithDevTools)({ port: 8000 }) : _redux.compose;
+  var composeEnhancers = enableDevtools ? (typeof window === 'undefined' ? 'undefined' : _typeof(window)) === "object" && window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ ? window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ : (0, _remoteReduxDevtools.composeWithDevTools)({ port: 8000 }) : _redux.compose;
 
   var enhancer = composeEnhancers((0, _redux.applyMiddleware)((0, _effectMiddleware2.default)(app)));
   var store = (0, _redux.createStore)(reducer, {}, enhancer);
