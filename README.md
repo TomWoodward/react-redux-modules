@@ -83,7 +83,21 @@ export default new Module('MyModule', {
 Effects are tied to a single action and will be triggered after the action is reduced. Effects are plain functions
 and can be used for whatever side effects you want, async, whatever. For your pleasure these things are 
 passed as an object to the effect function: `{state, localState, action, payload, dispatch, actions}` where `actions`
-is a map of action creators for each action in this module, in case you want to dispatch one of those.
+is a map of action dispatchers for each action in this module. The actions passed into the effect are already wrapped with dispatch. The actual `dispatch` function is also passed in case you need to dispatch an action from another module.
+
+```js
+import {Module} from 'react-redux-modules';
+import otherModule from '../other/place/module';
+import MainComponent from './MainComponent';
+
+export default new Module('MyModule', {
+  component: MainComponent,
+  effects: {
+    alarm: ({actions}) => actions.snooze(),
+    snooze: ({dispatch}) => dispatch(otherModule.actions.snooze())   
+  }
+});
+```
 
 ### Actions
 
@@ -91,8 +105,7 @@ Any action referenced in either the reducer or effect configs (doesn't have to b
 action creator in `module.actions`. If a component is connected all module actions are bound to its props by
 default, so calling `this.props.actionName()` will dispatch the action `actionName`. If you want to dispatch an action
 from a different module, you can, but you have to import the module and call dispatch explicitly: 
-`this.props.dispatch(otherModule.actions.actionName())`. Any arguments that are passed to the action creator end up in the 
-`payload` of the action by the time it gets to the reducers and effects.
+`this.props.dispatch(otherModule.actions.actionName())`. Action creators accept one argument which is mapped to `payload` in  reducers and effects.
 
 ### Navigation
 
