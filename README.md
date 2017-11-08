@@ -105,8 +105,7 @@ Any action referenced in either the reducer or effect configs (doesn't have to b
 action creator in `module.actions`. If a component is connected all module actions are bound to its props by
 default, so calling `this.props.actionName()` will dispatch the action `actionName`. If you want to dispatch an action
 from a different module, you can, but you have to import the module and call dispatch explicitly: 
-`this.props.dispatch(otherModule.actions.actionName())`. Any arguments that are passed to the action creator end up in the 
-`payload` of the action by the time it gets to the reducers and effects.
+`this.props.dispatch(otherModule.actions.actionName())`. Action creators accept one argument which is mapped to `payload` in  reducers and effects.
 
 ### Navigation
 
