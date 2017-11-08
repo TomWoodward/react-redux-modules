@@ -15,7 +15,7 @@ export default class Module {
   navigationOptions = {};
 
   actions = {
-    navigate: () => NavigationActions.navigate({routeName: this.fullname})
+    navigate: ({params, action}) => NavigationActions.navigate({routeName: this.fullname, params, action})
   };
 
   initialState = {};
@@ -221,7 +221,7 @@ export default class Module {
 
   getNavigator() {
     const screens = flow(
-      keyBy(module => module.name),
+      keyBy(module => module.fullname),
       mapValues(module => module.getNavigatorConfig())
     )(this.getNavigableSubmodules());
 
