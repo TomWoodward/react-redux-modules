@@ -35,6 +35,10 @@ export default class Module {
     'effects',
   ]);
 
+  rootSelector(state, path) {
+    return get(`${this.fullname}.${path}`, state);
+  }
+
   getEffectRunners() {
     return flow(
       mapKeys(this.getFullActionName),
@@ -48,13 +52,25 @@ export default class Module {
 
   getEffectRunner = effect => (state, dispatch, action) => {
     effect({
-      state, 
-      localState: get(this.fullname, state),
+      ...this.getStateConsumptionHelpers(state),
+      ...this.getStateModificationHelpers(dispatch),
       action: action,
-      actions: this.actions,
       payload: action.payload,
-      dispatch: dispatch,
     });
+  };
+
+  getStateConsumptionHelpers = state => {
+    return {
+      localState: get(this.fullname, state),
+      state,
+    };
+  };
+
+  getStateModificationHelpers = dispatch => {
+    return {
+      actions: mapValues(action => flow(action, dispatch), this.actions),
+      dispatch: dispatch,
+    };
   };
 
   getSubmoduleReducer() {
@@ -67,14 +83,14 @@ export default class Module {
       keyBy(module => module.getName()),
       mapValues(module => module.getReducer()),
     )(this.submodules));
-    
+
     return (state = this.initialState, action) => {
       return reducer(pick(submoduleNames, state), action);
     };
   }
 
   getReducer() {
-    const reducerMap = mapKeys(this.getFullActionName, this.reducers); 
+    const reducerMap = mapKeys(this.getFullActionName, this.reducers);
     const submoduleReducer = this.getSubmoduleReducer();
 
     return (state = this.initialState, action) => {
@@ -126,17 +142,15 @@ export default class Module {
     return flatten(this.submodules.map(module => module.getModules()));
   });
 
-  defaultMapStateToProps = (state) => {
-    return {
-      ...get(this.fullname, state)
-    }
+  defaultMapStateToProps = ({localState}) => {
+    return localState;
   };
 
-  defaultMapDispatchToProps = (dispatch) => {
+  defaultMapDispatchToProps = ({actions, dispatch}) => {
     return {
-      ...mapValues(action => flow(action, dispatch), this.actions),
+      ...actions,
       dispatch
-    }
+    };
   };
 
   setComponent(component) {
