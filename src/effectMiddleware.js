@@ -1,4 +1,5 @@
 import {mergeAll, keyBy} from 'lodash/fp';
+import {get} from 'lodash/fp';
 
 export default app => {
   const modules = app.getModules();
@@ -9,8 +10,10 @@ export default app => {
   return store => next => action => {
     const result = next(action);
 
-    if (action.type === 'Navigation/NAVIGATE') {
-      const chunks = action.routeName.split('.');
+    if (['Navigation/NAVIGATE', 'Navigation/BACK', 'Navigation/RESET'].indexOf(action.type) > -1) {
+      const state = store.getState().navigation;
+      const routeName = get(`routes.${state.index}.routeName`, state);
+      const chunks = routeName.split('.');
       const moduleNames = chunks.map((name, i) => {
         return chunks.slice(0, i + 1).join('.');
       });

@@ -46,7 +46,7 @@ export default function(app, options = {}) {
   ];
 
   if (isWeb()) {
-    middleware.push(browserHistoryMiddleware(Navigator));
+    middleware.push(browserHistoryMiddleware(initialRouterAction, Navigator));
   }
 
   const enhancer = composeEnhancers(applyMiddleware(...middleware));

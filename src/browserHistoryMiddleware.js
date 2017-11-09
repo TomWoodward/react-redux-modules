@@ -1,14 +1,19 @@
+import {NavigationActions} from 'react-navigation';
 import {get} from 'lodash/fp';
 
-export default navigation => store => {
+export default (initialRouterAction, navigation) => store => {
   const router = navigation.router;
+  const state = store.getState().navigation;
+  const title = get(`routes.${state.index}.params.title`, state);
+
+  window.history.replaceState({actions: [initialRouterAction]}, title);
 
   window.onpopstate = e => {
-    e.preventDefault();
-    const action = router.getActionForPathAndParams(window.location.pathname.substr(1));
-    if (action) {
-      store.dispatch(action);
-    }
+    const actions = e.state.actions;
+    store.dispatch(NavigationActions.reset({
+      index: actions.length - 1,
+      actions
+    }));
   };
   
   return next => action => {
@@ -19,7 +24,9 @@ export default navigation => store => {
         const state = store.getState().navigation;
         const title = get(`routes.${state.index}.params.title`, state);
         const {path} = router.getPathAndParamsForState(state);
-        window.history.pushState({}, title, '/' + path);
+        window.history.pushState({
+          actions: [...window.history.state.actions, action]
+        }, title, '/' + path);
         break;
       }
       case 'Navigation/SET_PARAMS': {
