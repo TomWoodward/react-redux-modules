@@ -13,11 +13,11 @@ export default class Module {
   basePath = '';
   submodules = [];
   navigationOptions = {};
-
+  selectors = {};
   actions = {
-    navigate: ({params, action}) => NavigationActions.navigate({routeName: this.fullname, params, action})
+    navigate: ({params, action}) => NavigationActions.navigate({routeName: this.fullname, params, action}),
+    setRouteParams: ({params, key}) => NavigationActions.setParams({key, params})
   };
-
   initialState = {};
   reducers = {};
   effects = [];
@@ -36,6 +36,7 @@ export default class Module {
     'initialState',
     'reducers',
     'effects',
+    'selectors'
   ]);
 
   rootSelector(state, path) {
@@ -65,7 +66,7 @@ export default class Module {
 
   getStateConsumptionHelpers = state => {
     return {
-      route: get(`navigation.routes.${state.navigation.index}`, state),
+      route:  get(`navigation.routes.${state.navigation.index}`, state),
       localState: get(this.fullname, state),
       state,
     };
@@ -133,6 +134,10 @@ export default class Module {
       const type = this.getFullActionName(key);
       return payload => ({type, payload});
     }));
+
+    this.selectors = mapValues(selector => {
+      return state => selector(this.getStateConsumptionHelpers(state));
+    }, this.selectors);
 
     this.submodules.forEach(module => {
       module.initialize();

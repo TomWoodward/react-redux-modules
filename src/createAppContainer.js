@@ -5,7 +5,12 @@ import {connect, Provider} from 'react-redux';
 import {addNavigationHelpers} from 'react-navigation';
 import {composeWithDevTools} from 'remote-redux-devtools';
 import effectMiddleware from './effectMiddleware';
+import browserHistoryMiddleware from './browserHistoryMiddleware';
 import Module from './Module';
+
+function isWeb() {
+  return typeof window === "object";
+}
 
 export default function(app, options = {}) {
   app.initialize();
@@ -15,8 +20,8 @@ export default function(app, options = {}) {
   }
 
   const Navigator = app.getNavigator();
-  const {initialPath, enableDevtools} = options;
-
+  const {enableDevtools} = options;
+  const initialPath = options.initialPath || isWeb() ? window.location.pathname.substr(1) : null;
   const initialRouterAction = Navigator.router.getActionForPathAndParams(initialPath);
   const initialRouterState = initialRouterAction ? Navigator.router.getStateForAction(initialRouterAction) : null;
 
@@ -31,12 +36,20 @@ export default function(app, options = {}) {
   });
 
   const composeEnhancers = enableDevtools
-    ? typeof window === "object" && window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__
+    ? isWeb() && window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__
       ? window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__
       : composeWithDevTools({port: 8000})
     : compose;
 
-  const enhancer = composeEnhancers(applyMiddleware(effectMiddleware(app)));
+  const middleware = [
+    effectMiddleware(app)
+  ];
+
+  if (isWeb()) {
+    middleware.push(browserHistoryMiddleware(Navigator));
+  }
+
+  const enhancer = composeEnhancers(applyMiddleware(...middleware));
   const store = createStore(reducer, {}, enhancer);
 
   const mapStateToProps = ({navigation}) => ({state: navigation});
