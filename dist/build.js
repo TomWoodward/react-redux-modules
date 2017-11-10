@@ -2331,9 +2331,11 @@ var Module = function () {
     _classCallCheck(this, Module);
 
     this.component = null;
+    this.container = null;
+    this.containers = [];
     this.namespace = '';
     this.name = '';
-    this.path = '';
+    this.path = '/';
     this.basePath = '';
     this.submodules = [];
     this.navigationOptions = {};
@@ -2353,7 +2355,7 @@ var Module = function () {
     this.initialState = {};
     this.reducers = {};
     this.effects = [];
-    this.getValidOptions = (0, _fp.pick)(['path', 'component', 'submodules', 'navigationOptions', 'initialState', 'reducers', 'effects', 'selectors']);
+    this.getValidOptions = (0, _fp.pick)(['path', 'component', 'container', 'submodules', 'navigationOptions', 'initialState', 'reducers', 'effects', 'selectors']);
 
     this.getFullActionName = function (key) {
       return _this.fullname + '/' + key;
@@ -2391,11 +2393,17 @@ var Module = function () {
         module.setNamespace(_this.fullname);
       });
 
-      if (!_this.namespace) {
-        _this.submodules.forEach(function (module) {
-          module.setBasePath(_this.path);
-        });
+      _this.submodules.forEach(function (module) {
+        module.setBasePath(_this.getPath());
+      });
+
+      if (_this.hasContainer()) {
+        _this.containers.push(_this.getContainer());
       }
+
+      _this.submodules.forEach(function (module) {
+        module.setContainers(_this.containers);
+      });
 
       var actions = _extends({}, _this.effects, _this.reducers);
 
@@ -2521,7 +2529,7 @@ var Module = function () {
   }, {
     key: 'getPath',
     value: function getPath() {
-      return (0, _fp.filter)(_fp.identity, [this.basePath, this.path]).join('/');
+      return (0, _fp.filter)(_fp.identity, [(0, _fp.trimChars)('/', this.basePath), (0, _fp.trimChars)('/', this.path)]).join('/');
     }
   }, {
     key: 'setNamespace',
@@ -2530,9 +2538,19 @@ var Module = function () {
       this.fullname = this.namespace + '.' + this.getName();
     }
   }, {
-    key: 'setComponent',
-    value: function setComponent(component) {
-      this.component = component;
+    key: 'setContainers',
+    value: function setContainers(containers) {
+      this.containers = containers;
+    }
+  }, {
+    key: 'hasContainer',
+    value: function hasContainer() {
+      return !!this.container;
+    }
+  }, {
+    key: 'getContainer',
+    value: function getContainer() {
+      return this.container;
     }
   }, {
     key: 'hasComponent',
@@ -2542,24 +2560,17 @@ var Module = function () {
   }, {
     key: 'getComponent',
     value: function getComponent() {
-      return this.component;
-    }
-  }, {
-    key: 'getNavigableSubmodules',
-    value: function getNavigableSubmodules() {
-      return (0, _fp.filter)(function (module) {
-        return module.isNavigable();
-      }, this.submodules);
-    }
-  }, {
-    key: 'hasNavigableSubmodules',
-    value: function hasNavigableSubmodules() {
-      return this.getNavigableSubmodules().length > 0;
+      var elements = [].concat(_toConsumableArray(this.containers), [this.component]);
+      return function () {
+        return (0, _fp.reduceRight)(function (element, result) {
+          return _react2.default.createElement(element, {}, result);
+        }, null, elements);
+      };
     }
   }, {
     key: 'isNavigable',
     value: function isNavigable() {
-      return this.hasComponent() || this.hasNavigableSubmodules();
+      return this.hasComponent();
     }
   }, {
     key: 'getNavigatorConfig',
@@ -2568,30 +2579,24 @@ var Module = function () {
         throw new Error('cannot build navigation to module ' + this.fullname);
       }
 
-      if (this.hasNavigableSubmodules()) {
-        return {
-          path: this.getPath(),
-          screen: this.getNavigator(),
-          navigationOptions: this.navigationOptions
-        };
-      }
-
       return {
-        screen: this.component,
         path: this.getPath(),
+        screen: this.getComponent(),
         navigationOptions: this.navigationOptions
       };
     }
   }, {
     key: 'getNavigator',
     value: function getNavigator() {
-      var _this4 = this;
-
-      var screens = (0, _fp.flow)((0, _fp.keyBy)(function (module) {
+      var screens = (0, _fp.flow)((0, _fp.filter)(function (submodule) {
+        return submodule.isNavigable();
+      }), (0, _fp.keyBy)(function (module) {
         return module.fullname;
       }), (0, _fp.mapValues)(function (module) {
         return module.getNavigatorConfig();
-      }))(this.getNavigableSubmodules());
+      }))(this.getModules());
+
+      console.log(screens);
 
       var NavView = function NavView(_ref5) {
         var navigation = _ref5.navigation,
@@ -2602,11 +2607,7 @@ var Module = function () {
             state: state.routes[state.index]
           })) });
 
-        if (_this4.hasComponent()) {
-          return _react2.default.createElement(_this4.getComponent(), {}, content);
-        } else {
-          return content;
-        }
+        return content;
       };
 
       return (0, _reactNavigation.createNavigator)((0, _reactNavigation.StackRouter)(screens))(NavView);
@@ -10939,6 +10940,7 @@ exports.default = function (routeConfigs) {
     getScreenConfig: _getScreenConfigDeprecated2.default
   };
 };
+
 
 /***/ }),
 /* 108 */
@@ -30042,17 +30044,18 @@ exports.default = function (app) {
 
   app.initialize();
 
-  if (!app.isNavigable()) {
-    throw new Error('Root module ' + app.name + ' must be navigable');
-  }
-
   var Navigator = app.getNavigator();
   var enableDevtools = options.enableDevtools;
 
   var initialPath = options.initialPath || isWeb() ? window.location.pathname.substr(1) : null;
-  var initialRouterAction = Navigator.router.getActionForPathAndParams(initialPath);
-  var initialRouterState = initialRouterAction ? Navigator.router.getStateForAction(initialRouterAction) : null;
 
+  var initialRouterState = Navigator.router.getStateForAction(_reactNavigation.NavigationActions.init());
+  var initialRouterAction = Navigator.router.getActionForPathAndParams(initialPath);
+  if (initialRouterAction) {
+    initialRouterState = Navigator.router.getStateForAction(initialRouterAction, initialRouterState);
+  }
+
+  console.log(initialRouterAction, initialRouterState);
   var navigationReducer = function navigationReducer() {
     var state = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : initialRouterState;
     var action = arguments[1];
@@ -38569,16 +38572,11 @@ exports.default = function (initialRouterAction, navigation) {
     window.history.replaceState({ actions: [initialRouterAction] }, title);
 
     window.onpopstate = function (e) {
-      console.log(e);
-
       var actions = e.state.actions;
-
       store.dispatch(_reactNavigation.NavigationActions.reset({
         index: actions.length - 1,
         actions: actions
       }));
-      //const action = router.getActionForPathAndParams(window.location.pathname.substr(1));
-      //store.dispatch(action);
     };
 
     return function (next) {

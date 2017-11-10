@@ -2,7 +2,7 @@ import React from 'react';
 import {filter, keyBy, flow, reduce, mapValues, merge} from 'lodash/fp';
 import {createStore, combineReducers, compose, applyMiddleware} from 'redux';
 import {connect, Provider} from 'react-redux';
-import {addNavigationHelpers} from 'react-navigation';
+import {NavigationActions, addNavigationHelpers} from 'react-navigation';
 import {composeWithDevTools} from 'remote-redux-devtools';
 import effectMiddleware from './effectMiddleware';
 import browserHistoryMiddleware from './browserHistoryMiddleware';
@@ -15,15 +15,17 @@ function isWeb() {
 export default function(app, options = {}) {
   app.initialize();
 
-  if (!app.isNavigable()) {
-    throw new Error(`Root module ${app.name} must be navigable`);
-  }
-
   const Navigator = app.getNavigator();
   const {enableDevtools} = options;
   const initialPath = options.initialPath || isWeb() ? window.location.pathname.substr(1) : null;
+
+  let initialRouterState = Navigator.router.getStateForAction(
+      NavigationActions.init()
+  );
   const initialRouterAction = Navigator.router.getActionForPathAndParams(initialPath);
-  const initialRouterState = initialRouterAction ? Navigator.router.getStateForAction(initialRouterAction) : null;
+  if (initialRouterAction) {
+    initialRouterState = Navigator.router.getStateForAction(initialRouterAction, initialRouterState);
+  }
 
   const navigationReducer = (state = initialRouterState, action) => {
     const nextState = Navigator.router.getStateForAction(action, state);

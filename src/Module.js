@@ -3,10 +3,12 @@ import {assign, once, flatten, pick, keyBy, mapKeys, mapValues} from 'lodash/fp'
 import {NavigationActions, createNavigator, addNavigationHelpers, StackRouter} from 'react-navigation';
 import {mapValues as mapValuesWithKey} from 'lodash';
 import {combineReducers} from 'redux';
-import {identity, filter, flow, get, set} from 'lodash/fp';
+import {reduceRight, trimChars, identity, filter, flow, get, set} from 'lodash/fp';
 
 export default class Module {
   component = null;
+  container = null;
+  containers = [];
   namespace = '';
   name = '';
   path = '';
@@ -31,6 +33,7 @@ export default class Module {
   getValidOptions = pick([
     'path',
     'component',
+    'container',
     'submodules',
     'navigationOptions',
     'initialState',
@@ -119,11 +122,17 @@ export default class Module {
       module.setNamespace(this.fullname);
     });
 
-    if (!this.namespace) {
-      this.submodules.forEach(module => {
-        module.setBasePath(this.path);
-      });
+    this.submodules.forEach(module => {
+      module.setBasePath(this.getPath());
+    });
+
+    if (this.hasContainer()) {
+      this.containers.push(this.getContainer());
     }
+
+    this.submodules.forEach(module => {
+      module.setContainers(this.containers);
+    });
 
     const actions = {
       ...this.effects,
@@ -153,7 +162,7 @@ export default class Module {
   }
 
   getPath() {
-    return filter(identity, [this.basePath, this.path]).join('/');
+    return filter(identity, [trimChars('/', this.basePath), trimChars('/', this.path)]).join('/');
   }
 
   setNamespace(namespace) {
@@ -180,8 +189,16 @@ export default class Module {
     };
   };
 
-  setComponent(component) {
-    this.component = component;
+  setContainers(containers) {
+    this.containers = containers;
+  }
+
+  hasContainer() {
+    return !!this.container;
+  }
+
+  getContainer() {
+    return this.container;
   }
 
   hasComponent() {
@@ -189,19 +206,12 @@ export default class Module {
   }
 
   getComponent() {
-    return this.component;
-  }
-
-  getNavigableSubmodules() {
-    return filter(module => module.isNavigable(), this.submodules);
-  }
-
-  hasNavigableSubmodules() {
-    return this.getNavigableSubmodules().length > 0;
+    const elements = [...this.containers, this.component];
+    return () => reduceRight((element, result) => React.createElement(element, {}, result), null, elements);
   }
 
   isNavigable() {
-    return this.hasComponent() || this.hasNavigableSubmodules();
+    return this.hasComponent();
   }
 
   getNavigatorConfig() {
@@ -209,26 +219,19 @@ export default class Module {
       throw new Error(`cannot build navigation to module ${this.fullname}`);
     }
 
-    if (this.hasNavigableSubmodules()) {
-      return {
-        path: this.getPath(),
-        screen: this.getNavigator(),
-        navigationOptions: this.navigationOptions,
-      };
-    }
-
     return {
-      screen: this.component,
       path: this.getPath(),
+      screen: this.getComponent(),
       navigationOptions: this.navigationOptions,
     };
   }
 
   getNavigator() {
     const screens = flow(
+      filter(submodule => submodule.isNavigable()),
       keyBy(module => module.fullname),
       mapValues(module => module.getNavigatorConfig())
-    )(this.getNavigableSubmodules());
+    )(this.getModules());
 
     const NavView = ({ navigation, router }) => {
       const {state} = navigation;
@@ -236,12 +239,8 @@ export default class Module {
         ...navigation,
         state: state.routes[state.index],
       })});
-
-      if (this.hasComponent()) {
-        return React.createElement(this.getComponent(), {}, content);
-      } else {
-        return content;
-      }
+  
+      return content;
     };
 
     return createNavigator(StackRouter(screens))(NavView);
