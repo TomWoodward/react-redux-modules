@@ -146,7 +146,7 @@ export default class Module {
     }));
 
     this.selectors = mapValues(selector => {
-      return state => selector(this.getStateConsumptionHelpers(state));
+      return (state, ...args) => selector(this.getStateConsumptionHelpers(state), ...args);
     }, this.selectors);
 
     this.submodules.forEach(module => {

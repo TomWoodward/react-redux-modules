@@ -2537,7 +2537,7 @@ var _initialiseProps = function _initialiseProps() {
     var submoduleComponent = childModuleName ? _this3.findSubmodule(childModuleName).getComponent() : null;
 
     return {
-      route: route, routeName: routeName, submoduleComponent: submoduleComponent,
+      route: route, submoduleComponent: submoduleComponent,
       localState: (0, _fp.get)(_this3.fullname, state),
       state: state
     };
@@ -2572,7 +2572,11 @@ var _initialiseProps = function _initialiseProps() {
 
     _this3.selectors = (0, _fp.mapValues)(function (selector) {
       return function (state) {
-        return selector(_this3.getStateConsumptionHelpers(state));
+        for (var _len = arguments.length, args = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
+          args[_key - 1] = arguments[_key];
+        }
+
+        return selector.apply(undefined, [_this3.getStateConsumptionHelpers(state)].concat(args));
       };
     }, _this3.selectors);
 
@@ -7722,7 +7726,7 @@ if (!Object.entries) {
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
-/** @license React v16.1.0
+/** @license React v16.1.1
  * react.production.min.js
  *
  * Copyright (c) 2013-present, Facebook, Inc.
@@ -7743,7 +7747,7 @@ e?"object with keys {"+Object.keys(a).join(", ")+"}":e,""));return h}function N(
 function P(a,b,e){var d=a.result,c=a.keyPrefix;a=a.func.call(a.context,b,a.count++);Array.isArray(a)?Q(a,d,e,p.thatReturnsArgument):null!=a&&(E(a)&&(b=c+(!a.key||b&&b.key===a.key?"":(""+a.key).replace(I,"$\x26/")+"/")+e,a={$$typeof:B,type:a.type,key:b,ref:a.ref,props:a.props,_owner:a._owner}),d.push(a))}function Q(a,b,e,d,c){var h="";null!=e&&(h=(""+e).replace(I,"$\x26/")+"/");b=K(b,h,d,c);null==a||M(a,"",P,b);L(b)}"function"===typeof Symbol&&Symbol["for"]&&Symbol["for"]("react.fragment");
 var R={Children:{map:function(a,b,e){if(null==a)return a;var d=[];Q(a,d,null,b,e);return d},forEach:function(a,b,e){if(null==a)return a;b=K(null,null,b,e);null==a||M(a,"",O,b);L(b)},count:function(a){return null==a?0:M(a,"",p.thatReturnsNull,null)},toArray:function(a){var b=[];Q(a,b,null,p.thatReturnsArgument);return b},only:function(a){E(a)?void 0:q("143");return a}},Component:t,PureComponent:u,unstable_AsyncComponent:x,createElement:D,cloneElement:function(a,b,e){var d=m({},a.props),c=a.key,h=a.ref,
 k=a._owner;if(null!=b){void 0!==b.ref&&(h=b.ref,k=z.current);void 0!==b.key&&(c=""+b.key);if(a.type&&a.type.defaultProps)var f=a.type.defaultProps;for(g in b)A.call(b,g)&&!C.hasOwnProperty(g)&&(d[g]=void 0===b[g]&&void 0!==f?f[g]:b[g])}var g=arguments.length-2;if(1===g)d.children=e;else if(1<g){f=Array(g);for(var l=0;l<g;l++)f[l]=arguments[l+2];d.children=f}return{$$typeof:B,type:a.type,key:c,ref:h,props:d,_owner:k}},createFactory:function(a){var b=D.bind(null,a);b.type=a;return b},isValidElement:E,
-version:"16.1.0",__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED:{ReactCurrentOwner:z,assign:m}},S=Object.freeze({default:R}),T=S&&R||S;module.exports=T["default"]?T["default"]:T;
+version:"16.1.1",__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED:{ReactCurrentOwner:z,assign:m}},S=Object.freeze({default:R}),T=S&&R||S;module.exports=T["default"]?T["default"]:T;
 
 
 /***/ }),
@@ -7751,7 +7755,7 @@ version:"16.1.0",__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED:{ReactCurren
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
-/* WEBPACK VAR INJECTION */(function(process) {/** @license React v16.1.0
+/* WEBPACK VAR INJECTION */(function(process) {/** @license React v16.1.1
  * react.development.js
  *
  * Copyright (c) 2013-present, Facebook, Inc.
@@ -7775,7 +7779,7 @@ var checkPropTypes = __webpack_require__(48);
 
 // TODO: this is special because it gets imported during build.
 
-var ReactVersion = '16.1.0';
+var ReactVersion = '16.1.1';
 
 /**
  * WARNING: DO NOT manually require this module.
@@ -8963,7 +8967,7 @@ function createElementWithValidation(type, props, children) {
   if (!validType) {
     var info = '';
     if (type === undefined || typeof type === 'object' && type !== null && Object.keys(type).length === 0) {
-      info += ' You likely forgot to export your component from the file ' + "it's defined in.";
+      info += ' You likely forgot to export your component from the file ' + "it's defined in, or you might have mixed up default and named imports.";
     }
 
     var sourceInfo = getSourceInfoErrorAddendum(props);
@@ -12721,7 +12725,6 @@ exports.default = function (routeConfigs) {
     getScreenConfig: _getScreenConfigDeprecated2.default
   };
 };
-
 
 /***/ }),
 /* 133 */
