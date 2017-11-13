@@ -15,7 +15,7 @@ function isWeb() {
 export default function(app, options = {}) {
   app.initialize();
 
-  const Navigator = app.getNavigator();
+  const Navigator = app.getNavigator()(app.component);
   const {enableDevtools} = options;
   const initialPath = options.initialPath || isWeb() ? window.location.pathname.substr(1) : null;
 
