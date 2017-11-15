@@ -5,6 +5,7 @@ import {connect, Provider} from 'react-redux';
 import {NavigationActions, addNavigationHelpers} from 'react-navigation';
 import {composeWithDevTools} from 'remote-redux-devtools';
 import effectMiddleware from './effectMiddleware';
+import navigationMiddleware, {dispatchNavigationActions} from './navigationMiddleware';
 import browserHistoryMiddleware from './browserHistoryMiddleware';
 import Module from './Module';
 
@@ -44,6 +45,7 @@ export default function(app, options = {}) {
     : compose;
 
   const middleware = [
+    navigationMiddleware(app),
     effectMiddleware(app)
   ];
 
@@ -53,6 +55,8 @@ export default function(app, options = {}) {
 
   const enhancer = composeEnhancers(applyMiddleware(...middleware));
   const store = createStore(reducer, {}, enhancer);
+
+  dispatchNavigationActions(app, store);
 
   const mapStateToProps = ({navigation}) => ({state: navigation});
   const NavigatorWithState = connect(mapStateToProps)(
