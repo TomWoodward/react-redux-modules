@@ -2538,6 +2538,15 @@ var _initialiseProps = function _initialiseProps() {
 
     return {
       route: route, submoduleComponent: submoduleComponent,
+      selectors: (0, _fp.mapValues)(function (selector) {
+        return function () {
+          for (var _len = arguments.length, args = Array(_len), _key = 0; _key < _len; _key++) {
+            args[_key] = arguments[_key];
+          }
+
+          return selector.apply(undefined, [state].concat(args));
+        };
+      }, _this3.selectors),
       localState: (0, _fp.get)(_this3.fullname, state),
       state: state
     };
@@ -2572,8 +2581,8 @@ var _initialiseProps = function _initialiseProps() {
 
     _this3.selectors = (0, _fp.mapValues)(function (selector) {
       return function (state) {
-        for (var _len = arguments.length, args = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
-          args[_key - 1] = arguments[_key];
+        for (var _len2 = arguments.length, args = Array(_len2 > 1 ? _len2 - 1 : 0), _key2 = 1; _key2 < _len2; _key2++) {
+          args[_key2 - 1] = arguments[_key2];
         }
 
         return selector.apply(undefined, [_this3.getStateConsumptionHelpers(state)].concat(args));

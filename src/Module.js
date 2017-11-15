@@ -79,6 +79,7 @@ export default class Module {
 
     return {
       route, submoduleComponent,
+      selectors: mapValues(selector => (...args) => selector(state, ...args), this.selectors),
       localState: get(this.fullname, state),
       state,
     };
