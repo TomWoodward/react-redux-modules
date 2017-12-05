@@ -2440,14 +2440,14 @@ var Module = function () {
       this.fullname = this.namespace + '.' + this.getName();
     }
   }, {
-    key: 'hasContainer',
-    value: function hasContainer() {
-      return !!this.container;
-    }
-  }, {
     key: 'hasComponent',
     value: function hasComponent() {
       return !!this.component;
+    }
+  }, {
+    key: 'getComponent',
+    value: function getComponent() {
+      return this.component;
     }
   }, {
     key: 'isNavigable',
@@ -2534,10 +2534,10 @@ var _initialiseProps = function _initialiseProps() {
     var route = (0, _fp.get)('navigation.routes.' + state.navigation.index, state);
     var routeName = (0, _fp.get)('routeName', route);
     var childModuleName = routeName.indexOf(_this3.fullname) === 0 && routeName.length > _this3.fullname.length ? routeName.substr(_this3.fullname.length + 1).split('.')[0] : null;
-    var submoduleComponent = childModuleName ? _this3.findSubmodule(childModuleName).getComponent() : null;
+    var SubmoduleComponent = childModuleName ? _this3.findSubmodule(childModuleName).getComponent() : null;
 
     return {
-      route: route, submoduleComponent: submoduleComponent,
+      route: route, SubmoduleComponent: SubmoduleComponent,
       selectors: (0, _fp.mapValues)(function (selector) {
         return function () {
           for (var _len = arguments.length, args = Array(_len), _key = 0; _key < _len; _key++) {
@@ -2609,9 +2609,9 @@ var _initialiseProps = function _initialiseProps() {
 
   this.defaultMapStateToProps = function (_ref3) {
     var localState = _ref3.localState,
-        submoduleComponent = _ref3.submoduleComponent;
+        SubmoduleComponent = _ref3.SubmoduleComponent;
 
-    return _extends({}, localState, { submoduleComponent: submoduleComponent });
+    return _extends({}, localState, { SubmoduleComponent: SubmoduleComponent });
   };
 
   this.defaultMapDispatchToProps = function (_ref4) {
@@ -2622,14 +2622,6 @@ var _initialiseProps = function _initialiseProps() {
       dispatch: dispatch
     });
   };
-
-  this.getComponent = (0, _fp.once)(function () {
-    if (_this3.hasContainer()) {
-      return _react2.default.createElement(_this3.container, {}, _this3.component);
-    } else {
-      return _react2.default.createElement(_this3.component);
-    }
-  });
 };
 
 exports.default = Module;

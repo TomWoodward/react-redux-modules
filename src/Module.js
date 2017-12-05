@@ -73,12 +73,12 @@ export default class Module {
     const childModuleName = routeName.indexOf(this.fullname) === 0 && routeName.length > this.fullname.length
       ? routeName.substr(this.fullname.length + 1).split('.')[0]
       : null;
-    const submoduleComponent = childModuleName
+    const SubmoduleComponent = childModuleName
       ? this.findSubmodule(childModuleName).getComponent()
       : null;
 
     return {
-      route, submoduleComponent,
+      route, SubmoduleComponent,
       selectors: mapValues(selector => (...args) => selector(state, ...args), this.selectors),
       localState: get(this.fullname, state),
       state,
@@ -100,7 +100,7 @@ export default class Module {
     const submoduleNames = this.submodules.map(module => module.getName());
     const reducer = combineReducers(flow(
       keyBy(module => module.getName()),
-      mapValues(module => module.getReducer()),
+      mapValues(module => module.getReducer())
     )(this.submodules));
 
     return (state = this.initialState, action) => {
@@ -184,8 +184,8 @@ export default class Module {
     return find({name}, this.submodules);
   }
 
-  defaultMapStateToProps = ({localState, submoduleComponent}) => {
-    return {...localState, submoduleComponent};
+  defaultMapStateToProps = ({localState, SubmoduleComponent}) => {
+    return {...localState, SubmoduleComponent};
   };
 
   defaultMapDispatchToProps = ({actions, dispatch}) => {
@@ -195,21 +195,13 @@ export default class Module {
     };
   };
 
-  hasContainer() {
-    return !!this.container;
-  }
-
   hasComponent() {
     return !!this.component;
   }
 
-  getComponent = once(() => {
-    if (this.hasContainer()) {
-      return React.createElement(this.container, {}, this.component);
-    } else {
-      return React.createElement(this.component);
-    }
-  });
+  getComponent() {
+    return this.component;
+  }
 
   isNavigable() {
     return this.hasComponent() && this.navigable;
