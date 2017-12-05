@@ -35,7 +35,7 @@ export default function(app, options = {}) {
 
   const reducer = combineReducers({
     navigation: navigationReducer,
-    App: app.getReducer(),
+    [app.name]: app.getReducer(),
   });
 
   const composeEnhancers = enableDevtools
