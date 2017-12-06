@@ -184,8 +184,8 @@ export default class Module {
     return find({name}, this.submodules);
   }
 
-  defaultMapStateToProps = ({localState, SubmoduleComponent}) => {
-    return {...localState, SubmoduleComponent};
+  defaultMapStateToProps = ({localState, ...helpers}) => {
+    return {...localState, ...helpers};
   };
 
   defaultMapDispatchToProps = ({actions, dispatch}) => {
