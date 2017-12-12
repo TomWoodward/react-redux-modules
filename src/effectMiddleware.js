@@ -10,7 +10,7 @@ export default app => {
     const result = next(action);
 
     if (effects[action.type]) {
-      effects[action.type](store.getState(), store.dispatch, action);
+      effects[action.type](store, action);
     }
 
     return result;

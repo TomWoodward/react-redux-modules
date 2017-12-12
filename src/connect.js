@@ -9,7 +9,7 @@ export default (getModule, component) => {
     const module = getModule();
     return getMapStateToProps(component, module)({
       ownProps,
-      ...module.getStateConsumptionHelpers(state)
+      ...module.getStateConsumptionHelpers(() => state)
     });
   };
   const mapDispatchToProps = (dispatch, ownProps) => {

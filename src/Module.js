@@ -57,17 +57,18 @@ export default class Module {
     return `${this.fullname}/${key}`;
   };
 
-  getEffectRunner = effect => (state, dispatch, action) => {
+  getEffectRunner = effect => (store, action) => {
     effect({
-      ...this.getStateConsumptionHelpers(state),
-      ...this.getStateModificationHelpers(dispatch),
+      ...this.getStateConsumptionHelpers(store.getState),
+      ...this.getStateModificationHelpers(store.dispatch),
       action: action,
       payload: action.payload,
       module: this,
     });
   };
 
-  getStateConsumptionHelpers = state => {
+  getStateConsumptionHelpers = getState => {
+    const state = getState();
     const route = get(`navigation.routes.${state.navigation.index}`, state);
     const routeName = get(`routeName`, route);
     const childModuleName = routeName.indexOf(this.fullname) === 0 && routeName.length > this.fullname.length
@@ -79,7 +80,7 @@ export default class Module {
 
     return {
       route, SubmoduleComponent,
-      selectors: mapValues(selector => (...args) => selector(state, ...args), this.selectors),
+      selectors: mapValues(selector => (...args) => selector(getState(), ...args), this.selectors),
       localState: get(this.fullname, state),
       state,
     };
@@ -147,7 +148,7 @@ export default class Module {
     }));
 
     this.selectors = mapValues(selector => {
-      return (state, ...args) => selector(this.getStateConsumptionHelpers(state), ...args);
+      return (state, ...args) => selector(this.getStateConsumptionHelpers(() => state), ...args);
     }, this.selectors);
 
     this.submodules.forEach(module => {
