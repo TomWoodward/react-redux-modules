@@ -154,8 +154,9 @@ export default class Module {
       return (state, ...args) => selector(this.getStateConsumptionHelpers(() => state), ...args);
     }, this.selectors);
 
-    this.submodules.forEach(module => {
-      module.initialize();
+    this.submodules.forEach(submodule => {
+      submodule.initialize();
+      this.initialState = set(submodule.name, submodule.initialState, this.initialState);
     });
   };
 
