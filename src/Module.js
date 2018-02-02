@@ -81,6 +81,7 @@ export default class Module {
     return {
       route, SubmoduleComponent,
       selectors: mapValues(selector => (...args) => selector(getState(), ...args), this.selectors),
+      module: this,
       localState: get(this.fullname, state),
       getState,
       state,
@@ -119,6 +120,7 @@ export default class Module {
 
       if (reducerMap[action.type]) {
         return reducerMap[action.type]({
+          module: this,
           localState: state,
           action: action,
           payload: action.payload
