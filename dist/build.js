@@ -2418,6 +2418,7 @@ var Module = function () {
 
         if (reducerMap[action.type]) {
           return reducerMap[action.type]({
+            module: _this2,
             localState: state,
             action: action,
             payload: action.payload
@@ -2557,6 +2558,7 @@ var _initialiseProps = function _initialiseProps() {
           return selector.apply(undefined, [getState()].concat(args));
         };
       }, _this3.selectors),
+      module: _this3,
       localState: (0, _fp.get)(_this3.fullname, state),
       getState: getState,
       state: state
@@ -2602,8 +2604,9 @@ var _initialiseProps = function _initialiseProps() {
       };
     }, _this3.selectors);
 
-    _this3.submodules.forEach(function (module) {
-      module.initialize();
+    _this3.submodules.forEach(function (submodule) {
+      submodule.initialize();
+      _this3.initialState = (0, _fp.set)(submodule.name, submodule.initialState, _this3.initialState);
     });
   };
 
@@ -12263,6 +12266,7 @@ Component) {
   }(_react2.default.Component);
 
   NavigationContainer.router = Component.router;
+  NavigationContainer.navigationOptions = null;
 
 
   return NavigationContainer;
@@ -13351,7 +13355,7 @@ exports.default = function (routeConfigs) {
         var _routes = order.map(function (routeName) {
           var tabRouter = tabRouters[routeName];
           if (tabRouter) {
-            var childAction = action.action || _NavigationActions2.default.init(_extends({}, action.params ? { params: action.params } : {}));
+            var childAction = _NavigationActions2.default.init();
             return _extends({}, tabRouter.getStateForAction(childAction), {
               key: routeName,
               routeName: routeName
@@ -13386,7 +13390,7 @@ exports.default = function (routeConfigs) {
       var activeTabLastState = state.routes[state.index];
       var activeTabRouter = tabRouters[order[state.index]];
       if (activeTabRouter) {
-        var activeTabState = activeTabRouter.getStateForAction(action.action || action, activeTabLastState);
+        var activeTabState = activeTabRouter.getStateForAction(action, activeTabLastState);
         if (!activeTabState && inputState) {
           return null;
         }
