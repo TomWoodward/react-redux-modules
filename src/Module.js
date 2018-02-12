@@ -84,6 +84,7 @@ export default class Module {
       module: this,
       localState: get(this.fullname, state),
       getState,
+      getLocalState: () => get(this.fullname, getState()),
       state,
     };
   };
