@@ -2561,6 +2561,9 @@ var _initialiseProps = function _initialiseProps() {
       module: _this3,
       localState: (0, _fp.get)(_this3.fullname, state),
       getState: getState,
+      getLocalState: function getLocalState() {
+        return (0, _fp.get)(_this3.fullname, getState());
+      },
       state: state
     };
   };
@@ -12169,6 +12172,8 @@ Component) {
         var path = url.split(delimiter)[1];
         if (typeof path === 'undefined') {
           path = url;
+        } else if (path === '') {
+          path = '/';
         }
         return {
           path: path,
