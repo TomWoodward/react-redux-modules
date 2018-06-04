@@ -9,7 +9,7 @@ export default new Module('MyModule');
 ```
 
 A module ties together the components of a react-redux module. The reducer, actions, side effects, and react component
-are all covered by module configurations.
+are all covered by module configurations. Modules also handle elements outside the redux state, like navigation.
 
 The only requirement for module is its name. The empy module shown above will generate a new section of the redux
 state called `MyModule`, but other than that do nothing.
@@ -56,7 +56,9 @@ import {set} from 'lodash/fp';
 
 export default new Module('MyModule', {
   component: MainComponent,
-  initialState: {},
+  initialState: {
+    counter: 0
+  },
   reducers: {
     onCount: (state, payload) => set('counter', state.counter + 1, state)
   }
@@ -173,126 +175,3 @@ ReactDOM.render(React.createElement(Container), document.getElementById('root'))
 
 `createAppContainer` inspects your module tree and generates a redux store, redux
 reducers, navigation router, sets up the required redux and navigation react components for you, and returns that.
-
-
-
-
-# below this is just ideas
-
-
-## mixin example (pagination)
-
-```js
-// - /mixins/Pagination/index.js
-import {Mixin} from 'react-redux-modules';
-import {set} from 'lodash/fp';
-
-export default class Pagination extends Mixin {
-  initialState = {
-    data: {},
-    selected: [],
-    currentPage: 0,
-    totalPages: 0,
-  };
-  
-  reducers = {
-    setPage: (state, {page}) => set('page', page, state),
-    receivePage: (state, {results}) => set('selected', results, state) // pretend this puts ids in selected and data in data
-  };
-  
-  effects = {
-    setPage: body => this.loadPageEffect(body),
-  };
-  
-  loadPageEffect = ({payload, dispatch, actions}) => {
-    // do something, potentially with some extra arguments
-    // passed into the module constructor, to get the results
-    dispatch(actions.receivePage({results}));
-  };
-}
-```
-
-the idea is that the mixin would not represent any new state or anything, but its initialState, reducers and effects would
-be merged onto the module's. this would allow default functionality in the mixin while easily allowing you to override it 
-from the module by specifying a reducer or effect with the same name. The mixin could define components, which would just
-be connected to the module wherever they're used.
-
-```js
-// - /UserList/module.js
-import {Module} from 'react-redux-modules';
-import Pagination from '../mixins/Pagination';
-import ListComponent from './ListComponent';
-import UserRow from './UserRow';
-
-export default new Module('UserList', {
-  component: Component,
-  mixins: [
-    new Pagination(/* probably some extra stuff */)
-  ]
-});
-```
-
-```js
-// - /UserList/Component.js
-import React from 'react';
-import {connect} from 'react-redux-modules';
-import PageLinks from '../mixins/Pagination/PageLinks';
-import ListComponent from './ListComponent';
-import module from './module';
-
-const ConnectedPageLinks = connect(() => module, PageLinks);
-
-export default function UserList() {
-  return <div>
-    <ListComponent />
-    <ConnectedPageLinks />
-  </div>
-}
-```
-
-```js
-// - /UserList/ListComponent.js
-import React, {Component} from 'react';
-import {connect} from 'react-redux-modules';
-import UserRow from './UserRow';
-import module from './module';
-
-class ListComponent extends Component {
-  static mapStateToProps(localState) {
-    return {
-      users: localState.selected;
-    };
-  }
-  
-  render() {
-    const {users} = this.props;
-    return <ul>
-      {users.map(user => <UserRow key={user} id={user} />)}
-    </ul>
-  }
-}
-
-export default connect(() => module, ListComponent);
-```
-
-```js
-// - /UserList/UserRow.js
-import React, {Component} from 'react';
-import {connect} from 'react-redux-modules';
-import module from './module';
-
-class UserRow extends Component {
-  static mapStateToProps(localState, state, ownProps) {
-    return {
-      user: localState.data[ownProps.id];
-    };
-  }
-  
-  render() {
-    const {user} = this.props;
-    return <li>{user.name}</li>;
-  }
-}
-
-export default connect(() => module, UserRow);
-```
