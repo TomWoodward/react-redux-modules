@@ -8,8 +8,9 @@ import {Module} from 'react-redux-modules';
 export default new Module('MyModule');
 ```
 
-A module ties together the components of a react-redux module. The reducer, actions, side effects, and react component
-are all covered by module configurations. Modules also handle elements outside the redux state, like navigation.
+A module ties together the components of a react-redux module. The reducer, actions and side effects are all
+covered by module configurations. Modules also handle elements outside the redux state, like navigation and
+the default react component.
 
 The only requirement for module is its name. The empy module shown above will generate a new section of the redux
 state called `MyModule`, but other than that do nothing.
