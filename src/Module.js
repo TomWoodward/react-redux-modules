@@ -1,49 +1,87 @@
 import React from 'react';
-import {connect} from 'react-redux';
-import {find, assign, once, flatten, pick, keyBy, mapKeys, mapValues} from 'lodash/fp';
-import {reduceRight, trimChars, identity, filter, flow, get, set} from 'lodash/fp';
-import {NavigationActions, createNavigator, addNavigationHelpers, StackRouter} from 'react-navigation';
+import {memoize, getOr, map, find, assign, once, flatten, pick, keyBy, mapKeys, mapValues, reduceRight, trimChars, identity, filter, flow, get, set} from 'lodash/fp';
+import pathToRegexp from 'path-to-regexp';
+import {callHistoryMethod} from './navigation';
+import Loadable from 'react-loadable'
 import {mapValues as mapValuesWithKey} from 'lodash';
-import {combineReducers} from 'redux';
+import {combineReducers, connect as reduxConnect} from 'redux';
+import connect from './connect';
 
 export default class Module {
   component = null;
   navigable = true;
+  singleRoute = true;
   namespace = '';
-  name = '';
-  path = '';
+  name = null;
+  path = null;
+  loadData = () => {};
   basePath = '';
   submodules = [];
-  navigationOptions = {};
   selectors = {};
   actions = {
-    navigate: ({params, action}) => NavigationActions.navigate({routeName: this.fullname, params, action}),
-    setRouteParams: ({params, key}) => NavigationActions.setParams({key, params})
+    navigate: (params, action = 'push') => callHistoryMethod(action, [this.makePath(params)])
   };
   initialState = {};
   reducers = {};
   effects = [];
 
   constructor(name, options = {}) {
-    Object.assign(this, this.getValidOptions(options));
     this.name = name;
-    this.fullname = this.name;
+    Object.assign(this, this.getValidOptions(options));
+
+    if (this.path) {
+      this.makePath = pathToRegexp.compile(this.path);
+    }
+
+    this.selectors = mapValues(selector => {
+      return (state, ...args) => selector(this.getStateConsumptionHelpers(state), ...args);
+    }, options.selectors);
+
+    const actions = {
+      ...this.effects,
+      ...this.reducers
+    };
+
+    this.actions = {
+      ...mapValuesWithKey(actions, (action, key) => {
+        return payload => {
+          return {
+            type: this.getFullActionName(key),
+            payload
+          };
+        };
+      }),
+      ...mapValuesWithKey({...this.actions, ...options.actions}, (action, key) => {
+        return (...args) => {
+          const payload = action(...args);
+          if (payload.type && payload.payload) {
+            return payload;
+          } else {
+            return {type: this.getFullActionName(key), payload}
+          }
+        };
+      })
+    };
+
+    if (options.root) {
+      this.setNamespace('');
+      this.setBasePath(options.basePath || '/');
+    }
   }
 
   getValidOptions = pick([
-    'path',
     'component',
-    'navigable',
-    'submodules',
-    'navigationOptions',
-    'initialState',
-    'reducers',
     'effects',
-    'selectors'
+    'loadData',
+    'initialState',
+    'navigable',
+    'path',
+    'reducers',
+    'submodules',
   ]);
 
   rootSelector(state, path) {
-    return get(`${this.fullname}.${path}`, state);
+    return get(`${this.getFullName()}.${path}`, state);
   }
 
   getEffectRunners() {
@@ -54,45 +92,39 @@ export default class Module {
   }
 
   getFullActionName = key => {
-    return `${this.fullname}/${key}`;
+    return `${this.getFullName()}/${key}`;
   };
 
-  getEffectRunner = effect => (store, action) => {
-    effect({
-      ...this.getStateConsumptionHelpers(store.getState),
+  getEffectRunner = effect => (store, action, services) => {
+    return effect({
+      ...this.getStateConsumptionHelpers(store.getState(), store.getState),
       ...this.getStateModificationHelpers(store.dispatch),
+      services,
       action: action,
       payload: action.payload,
-      module: this,
     });
   };
 
-  getStateConsumptionHelpers = getState => {
-    const state = getState();
-    const route = get(`navigation.routes.${state.navigation.index}`, state);
-    const routeName = get(`routeName`, route);
-    const childModuleName = routeName.indexOf(this.fullname) === 0 && routeName.length > this.fullname.length
-      ? routeName.substr(this.fullname.length + 1).split('.')[0]
-      : null;
-    const SubmoduleComponent = childModuleName
-      ? this.findSubmodule(childModuleName).getComponent()
-      : null;
-
+  getStateConsumptionHelpers = (state, getState = null) => {
     return {
-      route, SubmoduleComponent,
-      selectors: mapValues(selector => (...args) => selector(getState(), ...args), this.selectors),
       module: this,
-      localState: get(this.fullname, state),
-      getState,
-      getLocalState: () => get(this.fullname, getState()),
+      selectors: mapValues(selector => (...args) => selector(getState ? getState() : state, ...args), this.selectors),
       state,
+      localState: get(this.getFullName(), state),
+      ...(getState
+        ? {
+          getState,
+          getLocalState: flow(getState, get(this.getFullName())),
+        }
+        : {}
+      )
     };
   };
 
   getStateModificationHelpers = dispatch => {
     return {
-      actions: mapValues(action => flow(action, dispatch), this.actions),
-      dispatch: dispatch,
+      dispatch,
+      actions: mapValues(actionCreator => flow(actionCreator, dispatch), this.actions),
     };
   };
 
@@ -107,16 +139,22 @@ export default class Module {
       mapValues(module => module.getReducer())
     )(this.submodules));
 
-    return (state = this.initialState, action) => {
+    return (state, action) => {
       return reducer(pick(submoduleNames, state), action);
     };
+  }
+
+  getInitialState() {
+    return this.submodules.reduce((result, submodule) => {
+      return set(submodule.getName(), submodule.getInitialState(), this.initialState);
+    }, this.initialState);
   }
 
   getReducer() {
     const reducerMap = mapKeys(this.getFullActionName, this.reducers);
     const submoduleReducer = this.getSubmoduleReducer();
 
-    return (state = this.initialState, action) => {
+    return (state = this.getInitialState(), action) => {
       state = assign(state, submoduleReducer(state, action));
 
       if (reducerMap[action.type]) {
@@ -132,50 +170,32 @@ export default class Module {
     };
   }
 
-  initialize = () => {
-    this.submodules.forEach(module => {
-      module.setNamespace(this.fullname);
-    });
-
-    this.submodules.forEach(module => {
-      module.setBasePath(this.getPath());
-    });
-
-    const actions = {
-      ...this.effects,
-      ...this.reducers
-    };
-
-    this.actions = assign(this.actions, mapValuesWithKey(actions, (action, key) => {
-      const type = this.getFullActionName(key);
-      return payload => ({type, payload});
-    }));
-
-    this.selectors = mapValues(selector => {
-      return (state, ...args) => selector(this.getStateConsumptionHelpers(() => state), ...args);
-    }, this.selectors);
-
-    this.submodules.forEach(submodule => {
-      submodule.initialize();
-      this.initialState = set(submodule.name, submodule.initialState, this.initialState);
-    });
-  };
+  getFullName() {
+    return `${this.namespace ? `${this.namespace}.` : ''}${this.getName()}`;
+  }
 
   getName() {
-    return this.name || this.constructor.name;
+    return this.name;
   }
 
   setBasePath(basePath) {
     this.basePath = basePath;
+
+    this.submodules.forEach(module => {
+      module.setBasePath(this.getPath());
+    });
   }
 
   getPath() {
-    return filter(identity, [trimChars('/', this.basePath), trimChars('/', this.path)]).join('/');
+    return '/' + filter(identity, [trimChars('/', this.basePath), trimChars('/', this.path)]).join('/');
   }
 
   setNamespace(namespace) {
     this.namespace = namespace;
-    this.fullname = `${this.namespace}.${this.getName()}`;
+
+    this.submodules.forEach(module => {
+      module.setNamespace(this.getFullName());
+    });
   }
 
   getModules = once(() => {
@@ -190,13 +210,13 @@ export default class Module {
     return find({name}, this.submodules);
   }
 
-  defaultMapStateToProps = ({localState, ...helpers}) => {
-    return {...localState, ...helpers};
+  defaultMapStateToProps = props => {
+    return props;
   };
 
   defaultMapDispatchToProps = ({actions, dispatch}) => {
     return {
-      ...actions,
+      actions,
       dispatch
     };
   };
@@ -205,33 +225,45 @@ export default class Module {
     return !!this.component;
   }
 
-  getComponent() {
-    return this.component;
-  }
+  getComponent = once(() => {
+    return flow(
+      component => component instanceof Promise
+        ? Loadable({loader: () => this.component, loading: () => null})
+        : component,
+      component => connect(this, component)
+    )(this.component);
+  });
 
   isNavigable() {
     return this.hasComponent() && this.navigable;
   }
 
-  getNavigatorConfig() {
-    if (!this.isNavigable()) {
-      throw new Error(`cannot build navigation to module ${this.fullname}`);
+  matchPath = memoize(path => {
+    const result = {
+      name: this.getFullName(),
+      params: {}
+    };
+
+    if (!this.path) {
+      return result;
     }
 
+    const keys = [];
+    const re = pathToRegexp(this.getPath(), keys, {end: true});
+    const match = re.exec(path);
+
+    if (!match) {
+      return false;
+    }
+
+    const [url, ...values] = match;
+
     return {
-      path: this.getPath(),
-      screen: () => null,
-      navigationOptions: this.navigationOptions,
-    };
-  }
-
-  getNavigator() {
-    const screens = flow(
-      filter(submodule => submodule.isNavigable()),
-      keyBy(module => module.fullname),
-      mapValues(module => module.getNavigatorConfig())
-    )(this.getModules());
-
-    return createNavigator(StackRouter(screens));
-  }
+      ...result,
+      params: keys.reduce((result, key, index) => {
+        const value = values[index] ? decodeURIComponent(values[index]) : values[index];
+        return set(key.name, value, result)
+      }, {})
+    }
+  });
 }

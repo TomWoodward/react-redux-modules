@@ -1,12 +1,11 @@
 import React from 'react';
-import {filter, keyBy, flow, reduce, mapValues, merge} from 'lodash/fp';
+import {get, map, identity, last, noop, filter, keyBy, flow, reduce, mapValues, merge} from 'lodash/fp';
 import {createStore, combineReducers, compose, applyMiddleware} from 'redux';
+import Loadable from 'react-loadable';
 import {connect, Provider} from 'react-redux';
-import {NavigationActions, addNavigationHelpers} from 'react-navigation';
-import {composeWithDevTools} from 'remote-redux-devtools';
-import effectMiddleware from './effectMiddleware';
-import navigationMiddleware, {dispatchNavigationActions} from './navigationMiddleware';
-import browserHistoryMiddleware from './browserHistoryMiddleware';
+import {createBrowserHistory, createMemoryHistory} from 'history';
+import {navigationReducer, navigationMiddleware, NavigationContainer, dispatchNavigationActions} from './navigation';
+import EffectRunner from './EffectRunner';
 import Module from './Module';
 
 function isWeb() {
@@ -14,56 +13,55 @@ function isWeb() {
 }
 
 export default function(app, options = {}) {
-  app.initialize();
-
-  const Navigator = app.getNavigator()(app.component);
   const {enableDevtools} = options;
-  const initialPath = options.initialPath || isWeb() ? window.location.pathname.substr(1) : null;
+  const initialEntries = !isWeb() && options.initialHistory ? options.initialHistory : [];
 
-  let initialRouterState = Navigator.router.getStateForAction(
-      NavigationActions.init()
-  );
-  const initialRouterAction = Navigator.router.getActionForPathAndParams(initialPath);
-  if (initialRouterAction) {
-    initialRouterState = Navigator.router.getStateForAction(initialRouterAction, initialRouterState);
-  }
-
-  const navigationReducer = (state = initialRouterState, action) => {
-    const nextState = Navigator.router.getStateForAction(action, state);
-    return nextState || state;
-  };
+  const history = isWeb() ? createBrowserHistory() : createMemoryHistory({initialEntries});
 
   const reducer = combineReducers({
-    navigation: navigationReducer,
-    [app.name]: app.getReducer(),
+    Navigation: navigationReducer(app, history),
+    [app.getName()]: app.getReducer(),
   });
 
-  const composeEnhancers = enableDevtools
-    ? isWeb() && window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__
+  const getComposeWithDevTools = () => {
+    const {composeWithDevTools} = require('remote-redux-devtools');
+
+    return isWeb() && window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__
       ? window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__
       : composeWithDevTools({port: 8000})
-    : compose;
-
-  const middleware = [
-    navigationMiddleware(app),
-    effectMiddleware(app)
-  ];
-
-  if (isWeb()) {
-    middleware.push(browserHistoryMiddleware(initialRouterAction, Navigator));
   }
 
+  const composeEnhancers = enableDevtools
+    ? getComposeWithDevTools()
+    : compose;
+
+  const effectRunner = new EffectRunner(app, options.services);
+
+  const middleware = [
+    navigationMiddleware(app, history),
+    effectRunner.middleware()
+  ];
+
   const enhancer = composeEnhancers(applyMiddleware(...middleware));
-  const store = createStore(reducer, {}, enhancer);
+  const initialState = options.initialState || {};
+  const store = createStore(reducer, initialState, enhancer);
+  const loadableReporter = options.loadableReporter || noop;
 
-  dispatchNavigationActions(app, store);
+  const initialMatch = get('Navigation.match', store.getState());
+  if (initialMatch) {
+    dispatchNavigationActions(app, initialMatch, store.dispatch);
+  }
 
-  const mapStateToProps = ({navigation}) => ({state: navigation});
-  const NavigatorWithState = connect(mapStateToProps)(
-    ({state, dispatch}) => <Navigator navigation={addNavigationHelpers({dispatch, state})} />
-  );
+  const Container = () => <Loadable.Capture report={loadableReporter}>
+    <Provider store={store}>
+      <NavigationContainer app={app} history={history} />
+    </Provider>
+  </Loadable.Capture>;
 
-  return () => <Provider store={store}>
-    <NavigatorWithState /> 
-  </Provider>;
+  return {
+    effectRunner,
+    Container,
+    store,
+    history
+  }
 }

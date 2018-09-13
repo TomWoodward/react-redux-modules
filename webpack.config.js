@@ -1,3 +1,5 @@
+const nodeExternals = require('webpack-node-externals');
+
 module.exports = {
   entry: './src/index.js',
   output: {
@@ -8,6 +10,7 @@ module.exports = {
   resolve: {
     extensions: ['.web.js', '.js', '.json']
   },
+  externals: [nodeExternals()],
   module: {
     rules: [
       {
