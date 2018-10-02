@@ -170,7 +170,7 @@ const app = new Module('App', {
 return createAppContainer(app);
 
 // for web
-const Container = createAppContainer(app);
+const {Container} = createAppContainer(app);
 ReactDOM.render(React.createElement(Container), document.getElementById('root'));
 ```
 
