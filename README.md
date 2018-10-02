@@ -66,7 +66,7 @@ export default new Module('MyModule', {
 });
 ```
 
-Reducers are defined as a map of action names to reducer functions, the module combines these with any submodule
+Reducers are defined as a map of action names to reducer functions. The module combines these with any submodule
 reducers and builds the whole thing for you. `initialState` is optional and is empty by default.
 
 ### Effects
@@ -170,7 +170,7 @@ const app = new Module('App', {
 return createAppContainer(app);
 
 // for web
-const container = createAppContainer(app);
+const Container = createAppContainer(app);
 ReactDOM.render(React.createElement(Container), document.getElementById('root'));
 ```
 
