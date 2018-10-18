@@ -216,7 +216,7 @@ const {container} = createAppContainer(app, {
 });
 
 // for expo
-return container;
+export default container;
 
 // for web
 ReactDOM.render(React.createElement(Container), document.getElementById('root'));
