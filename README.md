@@ -8,7 +8,7 @@ import {Module} from 'react-redux-modules';
 export default new Module('MyModule');
 ```
 
-A module ties together the components of a react-redux module. The reducer, actions and side effects are all
+A module ties together the common elements of a redux domain. The reducer, actions and side effects are all
 covered by module configurations. Modules also handle elements outside the redux state, like navigation and
 the default react component.
 
@@ -29,24 +29,35 @@ export default new Module('MyModule', {
 ```js
 // - /myModule/MainComponent.js
 import React from 'react';  
-import {connect} from 'react-redux-modules'; 
 import module from './module';
 
-function MainComponent() {
+export default function MainComponent() {
   return <h1>Hello World</h1>;
 }
-
-export default connect(() => module, MainComponent);
 ```
 
 The `component` property of a module is the component that is rendered when this module is navigated to. The
-component is not connected to the redux state by default, use the `connect` function to connect this (or any)
-component to the module state. By default `connect` binds the entire module state subtree, plus dispatchers
-for all module actions. The props bound from the state can be overriden by providing a static
-`mapStateToProps(localState, state, ownProps)` on the component. Note that the first argument is the module
-state subtree, you can use this to not care about where this module falls in the application structure if its
-irrelevant to you. Sometimes accessing state outside of your module is necessary, like getting the currently
-logged in user, for this reason the complete state tree is also provided.
+module component is connected to the redux state by default. see the [connect](#connecting-components) section
+for how to configure the connection behavior.
+
+### Connecting Components
+
+```js
+// - /myModule/SomeComponent.js
+import React from 'react';  
+import {connect} from 'react-redux-modules'; 
+import module from './module';
+
+function SomeComponent() {
+  return <h1>Hello World</h1>;
+}
+
+export default connect(() => module, SomeComponent);
+```
+
+The `connect` function connects a component to the module state. By default `connect` passes the [state modification](#state-modification-helpers) and [state consumption](#state-consumption-helpers) helpers as props. This can be changed by providing a static `mapStateToProps` and/or `mapDispatchToProps` on the component, these functions will receive the helpers and allow you to filter or modify them before being applied to the component.
+
+Note that the first argument to `connect` can be either `module` or `() => module`, the latter being a workaround for the cyclical dependencies you may find yourself with between components and modules.
 
 ### Reducers
 
@@ -61,13 +72,12 @@ export default new Module('MyModule', {
     counter: 0
   },
   reducers: {
-    onCount: (state, payload) => set('counter', state.counter + 1, state)
+    onCount: ({localState, payload}) => set('counter', localState.counter + 1, state)
   }
 });
 ```
 
-Reducers are defined as a map of action names to reducer functions, the module combines these with any submodule
-reducers and builds the whole thing for you. `initialState` is optional and is empty by default.
+Reducers are defined as a map of action names to reducer functions, `initialState` is optional and is empty by default. Reducer functions receive one argument which is an object containing [state consumption helpers](#state-consumption-helpers) plus `action` and `payload`.
 
 ### Effects
 
@@ -84,9 +94,29 @@ export default new Module('MyModule', {
 ```
 
 Effects are tied to a single action and will be triggered after the action is reduced. Effects are plain functions
-and can be used for whatever side effects you want, async, whatever. For your pleasure these things are 
-passed as an object to the effect function: `{state, localState, action, payload, dispatch, actions}` where `actions`
-is a map of action dispatchers for each action in this module. The actions passed into the effect are already wrapped with dispatch. The actual `dispatch` function is also passed in case you need to dispatch an action from another module.
+and can be used for whatever side effects you want, async, whatever. Effects receive one argument which is an object containing both [state modification](#state-modification-helpers) and [state consumption](#state-consumption-helpers) helpers plus `action` and `payload`.
+
+### Selectors
+
+```js
+import {Module} from 'react-redux-modules';
+
+export default new Module('MyModule', {
+  component: MainComponent,
+  selectors: {
+    getSomething: ({localState}) => localState.someValue,
+    getThing: ({localState}, thing) => localState[thing]
+  }
+  effects: {
+    yell: ({selectors}) => alert(selectors.getSomething()),
+    yell2: ({selectors}) => alert(selectors.getThing('thing'))
+  }
+});
+```
+
+Selectors are used to retrieve values from the module state. Selectors are useful for abstracting the exact structure of your state or generating derived values. Selectors receive a first argument containing [state consumption helpers](#state-consumption-helpers) provided automatically, subsequent arguments can be optionally provided.
+
+### Actions
 
 ```js
 import {Module} from 'react-redux-modules';
@@ -102,35 +132,7 @@ export default new Module('MyModule', {
 });
 ```
 
-### Actions
-
-Any action referenced in either the reducer or effect configs (doesn't have to be in both) gets an automatically generated
-action creator in `module.actions`. If a component is connected all module actions are bound to its props by
-default, so calling `this.props.actionName()` will dispatch the action `actionName`. If you want to dispatch an action
-from a different module, you can, but you have to import the module and call dispatch explicitly: 
-`this.props.dispatch(otherModule.actions.actionName())`. Action creators accept one argument which is mapped to `payload` in  reducers and effects.
-
-### Navigation
-
-```js
-import {Module} from 'react-redux-modules';
-import MainComponent from './MainComponent';
-import otherMoudle from '../otherModule';
-
-export default new Module('MyModule', {
-  component: MainComponent,
-  navigationOptions: {
-    title: 'Home',
-  },
-  effects: {
-    goSomewhere: ({dispatch}) => dispatch(otherModule.actions.navigate())  
-  }
-});
-```
-
-Each module automatically gets a `navigate` action which tells the navigator to focus that module. Internally navigation
-is handled by [react navigation](https://reactnavigation.org/) and there is a there is a `navigationOptions` configuration
-which gets mapped to [this](https://reactnavigation.org/docs/navigators/navigation-options) for configuring the navigator.
+Any action referenced in either the reducer or effect configs (doesn't have to be in both) gets an automatically generated action creator. The default action creator invents a `type` property based on the name of the action, and sets the first argument passed in to the action payload. You can change this behavior by defining an action creator in the `actions` property, A custom action creator must return an object with keys `type` and `payload` or a type will be made for you and the result will be saved as the payload.
 
 ### Submodules
 
@@ -149,10 +151,51 @@ export default new Module('MyModule', {
 });
 ```
 
-Submodules are mostly a way to not have one giant list of modules in your `App.js`, each module will automatically
-include its submodule's reducers and introduce the submodules to the navigator.
+Each module will automatically include its submodule's reducers and introduce the submodules to the navigator.
 
-## Bootstrapping
+### Navigation
+
+```js
+import {Module} from 'react-redux-modules';
+import MainComponent from './MainComponent';
+import otherMoudle from '../otherModule';
+
+export default new Module('MyModule', {
+  component: MainComponent,
+  path: '/coolpath',
+  effects: {
+    goSomewhere: ({dispatch}) => dispatch(otherModule.actions.navigate()),
+    receiveNavigation: () => doSomething() 
+  }
+});
+```
+
+In order to be navigable a module must provide a react component and a path (url fragment). When the browser url matches the given path the module's component will be rendered and the receiveNavigation action will be dispatched if there is one.
+
+Each module automatically gets a `navigate` action which tells the navigator to focus that module. You can use this to navigate programatically, the browser url will be updated.
+
+A module's path is used as the path prefix for all submodules recursively. A module's component is also used as the layout for all submodules components recursively. Submodule components are passed into parent module components using the `children` react prop.
+
+If a parent module is behaving as a layout and doesn't have content of its own you'll want to provide `navigable: false` to prevent it from being rendered if none of the submodules match. 
+
+### Interactions between modules
+
+```js
+import {Module} from 'react-redux-modules';
+import MainComponent from './MainComponent';
+import otherMoudle from '../otherModule';
+
+export default new Module('MyModule', {
+  effects: {
+    goSomewhere: ({dispatch}) => dispatch(otherModule.actions.navigate()),
+    saySomething: ({state}) => alert(otherModule.selectors.getSomething(state, 'arg'))
+  }
+});
+```
+
+If you import a module instance, you can access properties like `actions` and `selectors`. However these will not be pre-bound to dispatch or the redux state, so you'll need to make sure you have access to those already.
+
+### Bootstrapping
 
 ```js
 import {createAppContainer, Module} from 'react-redux-modules';
@@ -160,19 +203,42 @@ import module1 from './module1';
 import module2 from './module2';
 
 const app = new Module('App', {
+  root: true, // tells rrm to initialize everything
   submodules: [
     module1,
     module2,
   ]
 });
 
+const {container} = createAppContainer(app, {
+  initialState: window.__PRELOADED_STATE__,              // for state from server, optional, default {}
+  enableDevtools: process.env.NODE_ENV === 'development' // enable devtools, optional, defalt false
+});
+
 // for expo
-return createAppContainer(app);
+return container;
 
 // for web
-const container = createAppContainer(app);
 ReactDOM.render(React.createElement(Container), document.getElementById('root'));
 ```
 
 `createAppContainer` inspects your module tree and generates a redux store, redux
-reducers, navigation router, sets up the required redux and navigation react components for you, and returns that.
+reducers, routing, sets up the required provider components for you, and returns that.
+
+### State Consumption Helpers
+- `module`: the module instance
+- `selectors`: selectors this module has defined, pre-loaded with the state.
+- `state`: the root redux state
+- `localState`: the local redux state for this module
+- `getState`: getter for root redux state (in case it changes over the course of whatever you're doing)
+- `getLocalState`:  getter for local redux state (in case it changes over the course of whatever you're doing)
+
+These helpers are all passed to selectors and effects.
+
+Components get passed everything except `getState` and `getLocalState`.
+
+Reducers only receive `module` and `localState`.
+
+### State Modification Helpers
+- `actions`: module actions, bound to dispatch
+- `dispatch`: for dispatching actions from other modules
